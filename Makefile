@@ -124,19 +124,68 @@ export_path   := $(subst $(empty) $(empty),:,$(library_paths))
 include_paths := $(foreach item,$(include_paths),-I$(item))
 library_paths := $(foreach item,$(library_paths),-L$(item))
 link_librarys := $(foreach item,$(link_librarys),-l$(item))
-run_paths := $(foreach item,$(library_paths), -Wl, -rpath=$(item))
+run_paths     := $(foreach item,$(library_paths),-Wl,-rpath=$(item))
 
 
 # ------------------ compiling and linking flag --------------------------------------------------------------------------
-#todo options are to be googled
-cpp_compile_flags := -std=c++11 -g -w -O0 -fPIC -pthtread -fopenmp $(support_define)
+#todo options are to be explained 
+cpp_compile_flags := -std=c++11 -g -w -O0 -fPIC -pthread -fopenmp $(support_define)
 cu_compile_flags  := -std=c++11 -g -w -O0 -Xcompiler "$(cpp_compile_flags)" $(cuda_arch) $(support_define)
 link_flags        := -pthread -fopenmp -Wl,-rpath='$$ORIGIN'
+# notice that -Xcompiler "$(xxxx)" means all args of xxxx will be passed in -Xcompiler as a whole
+
+cpp_compile_flags += $(include_paths)
+cu_compile_flags  += $(include_paths)
+link_flags        += $(library_paths) $(link_librarys) $(run_paths)
+
+#todo to explain
+ifneq ($(MAKECMDGOALS), clean)
+-include $(cpp_mk) $(cu_mk)
+endif
 
 
-# for debug and printing
-all:
-	@echo $(cpp_compile_flags) 
+
+
+# ------------------ make xxx --------------------------------------------------------------------------
+pro : workspace/pro
+trtpyc: python/trtpy/libtrtpyc.so
+
+
+workspace/pro: $(cpp_objs) $(cu_objs)
+	@echo Link $@
+	@mkdir -p $(dir $@)
+	@$(cc) $^ -o $@ $(link_flags)
+# $@ all targets     $^ all dependencies    $< 1-st prerequisite
+
+objs/%.cpp.o : src/%.cpp
+	@echo Compile CXX $<
+	@mkdir -p $(dir $@)
+	@$(cc) -c $< -o $@ $(cpp_compile_flags)
+	
+objs/%.cu.o : src/%.cu
+	@echo Compile CUDA $<
+	@mkdir -p $(dir $@)
+	@$(nvcc) -c $< -o $@ $(cu_compile_flags)
+
+
+yolo: workspace/pro
+	@cd workspace && ./pro yolo
+
+alphapose : workspace/pro
+	@cd workspace && ./pro alphapose
+
+fall : workspace/pro
+	@cd workspace && ./pro fall_recognize
+
+
+clean :
+	@rm -rf objs
+
+
+.PHONY : clean yolo alphapose fall debug
+
+
+
 
 
 
